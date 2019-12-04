@@ -46,7 +46,6 @@ BiocGenerator <-
     x
 }
 
-
 #' @export
 setMethod(
     "dim", "BiocGenerator",
@@ -79,7 +78,7 @@ setMethod(
     "yield", "BiocGenerator",
     function(object)
 {
-    ## browser()
+    browser()
     nb <- .nbatch(object) + 1L
     if (nb > .totalbatch(object))
         return(NULL)
@@ -92,12 +91,13 @@ setMethod(
     to <- offset - 1L + yieldSize(object)
     idx <- vector("list", length(offset))
     idx[is.na(to)] <- rep(list(TRUE), sum(is.na(to)))
-    idx[!is.na(to)] <- Map(seq, offset[!is.na(to)], to[!is.na(to)])
     if (any(to >= dim(object), na.rm = TRUE)) {
         to <- to - dim(object)
         idx[!is.na(to)] <- Map(.loopseq, offset[!is.na(to)],
                                to[!is.na(to)],
                                as.list(dim(object))[!is.na(to)])
+    } else {
+        idx[!is.na(to)] <- Map(seq, offset[!is.na(to)], to[!is.na(to)])
     }
     .offset(object) <- to + 1L  ## update the next offset after yielding.
     do.call("[", c(list(.source(object)), idx))
@@ -147,11 +147,6 @@ setMethod(
     }
     result
 })
-
-##
-BiocGenerator <- function()
-setMethod(
-    "", "BiocGenerator")
 
 SEGenerator <- function(SE, label_column, yieldSize, genFun) {
     gen <- BiocGenerator(SE, yieldSize = yieldSize)

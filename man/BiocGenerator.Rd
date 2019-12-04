@@ -4,7 +4,7 @@
 \alias{BiocGenerator}
 \title{Construct, yield, and iterate over rectangular objects}
 \usage{
-BiocGenerator()
+BiocGenerator(source, dim = base::dim(source), yieldSize = dim(source))
 }
 \description{
 Construct, yield, and iterate over rectangular objects
