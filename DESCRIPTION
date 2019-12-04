@@ -1,0 +1,18 @@
+Package: BiocGenerator
+Title: BiocGenerator is to enable deep learning models on lazy
+    Bioconductor data infrastructures.
+Version: 0.99.0
+Authors@R: c(person("Qian", "Liu", role = c("aut", "cre"), email =
+    "qliu7@buffalo.edu", comment = c(ORCID = "")), person("Martin",
+    "Morgan", role = "aut"))
+Description: This package will take Bioconductor lazy data
+    infrastructures as input, and output chunks of data to pass into
+    the deep learning models through keras R interface.
+License: What license it uses? 
+Encoding: UTF-8
+Depends:
+    R(>= 3.6.1)
+Imports:
+Suggests:
+    SummarizedExperiment (>= 1.16.0)
+RoxygenNote: 6.1.1
