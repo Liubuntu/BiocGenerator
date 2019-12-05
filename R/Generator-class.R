@@ -4,9 +4,7 @@
         source = "ANY",
         dim = "integer",
         yieldSize = "integer",
-        offset = "integer",
-        totalbatch = "integer",
-        nbatch = "integer"
+        offset = "integer"
     )
 )
 
@@ -21,10 +19,8 @@ BiocGenerator <-
 {
     yieldSize <- as.integer(yieldSize)
     offset <- rep(1L, length(dim))
-    totalbatch <- ceiling(dim/yieldSize)
-    totalbatch <- as.integer(prod(totalbatch[!is.na(totalbatch)]))
     .BiocGenerator(source = source, dim = dim, yieldSize = yieldSize,
-                   offset = offset, totalbatch = totalbatch, nbatch = 0L)
+                   offset = offset)
 }
 
 .source <- function(x) x$source
@@ -34,15 +30,6 @@ BiocGenerator <-
 `.offset<-` <- function(x, value) {
     updt <- !is.na(.offset(x))
     x$offset[updt] <- as.integer(value[updt])
-    x
-}
-
-.totalbatch <- function(x) x$totalbatch
-
-.nbatch <- function(x) x$nbatch
-
-`.nbatch<-` <- function(x, value) {
-    x$nbatch <- as.integer(value)
     x
 }
 
@@ -78,11 +65,7 @@ setMethod(
     "yield", "BiocGenerator",
     function(object)
 {
-    browser()
-    nb <- .nbatch(object) + 1L
-    if (nb > .totalbatch(object))
-        return(NULL)
-    .nbatch(object) <- nb
+    ## browser()
     offset <- pmin(.offset(object), dim(object))
     ## FIXME: better stopping behavior
     ## if (any(offset >= dim(object), na.rm=TRUE))
@@ -116,8 +99,6 @@ setMethod(
         "dim: ", .pretty_dim(dim(object)), "\n",
         "yieldSize: ", .pretty_dim(yieldSize(object)), "\n",
         "current offset: ", .pretty_dim(.offset(object)), "\n",
-        "total batches: ", .totalbatch(object), "\n", 
-        "nbatch: ", .nbatch(object), "\n",
         sep = ""
     )
 })
