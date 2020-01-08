@@ -57,33 +57,47 @@ setMethod(
 }
 
 ## "yield" returns a chunk of SummarizedExperiment object, need to
-## realize any lazy data here. 
+## realize any lazy data here.
+
+## now "yield" is a non-stopping yielding, will loop into beginning. 
 
 #' @export
-setGeneric("yield", function(object) standardGeneric("yield"))
+setGeneric("yield", function(object, ...) standardGeneric("yield"))
+
+#' @export
 setMethod(
     "yield", "BiocGenerator",
-    function(object)
+    function(object, stop = FALSE)
 {
     ## browser()
-    offset <- pmin(.offset(object), dim(object))
+    offset <- .offset(object)
+    if (stop && offset[!is.na(offset)] == dim(object)[!is.na(offset)])
+        return(NULL)
+    ## offset <- pmin(.offset(object), dim(object))
     ## FIXME: better stopping behavior
     ## if (any(offset >= dim(object), na.rm=TRUE))
     ##     return(NULL)
     ## to <- pmin(offset - 1L + yieldSize(object), dim(object))
-    to <- offset - 1L + yieldSize(object)
+    to <- offset - 1L + yieldSize(object)  ## to... 
     idx <- vector("list", length(offset))
     idx[is.na(to)] <- rep(list(TRUE), sum(is.na(to)))
     if (any(to >= dim(object), na.rm = TRUE)) {
-        to <- to - dim(object)
-        idx[!is.na(to)] <- Map(.loopseq, offset[!is.na(to)],
-                               to[!is.na(to)],
-                               as.list(dim(object))[!is.na(to)])
+        if (!stop) {
+            to <- to - dim(object) ## reset "to" if >= dim
+            idx[!is.na(to)] <- Map(.loopseq, offset[!is.na(to)],
+                                   to[!is.na(to)],
+                                   as.list(dim(object))[!is.na(to)])
+            .offset(object) <- to + 1L
+        } else {
+            idx[!is.na(to)] <- Map(seq, offset[!is.na(to)],
+                                   as.list(dim(object))[!is.na(to)])
+            .offset(object)[!is.na(to)] <- dim(object)[!is.na(to)]
+        }
     } else {
         idx[!is.na(to)] <- Map(seq, offset[!is.na(to)], to[!is.na(to)])
+        .offset(object) <- to + 1L  ## update .offset(object) after yielding.
     }
-    .offset(object) <- to + 1L  ## update the next offset after yielding.
-    do.call("[", c(list(.source(object)), idx))
+    do.call("[", c(list(.source(object)), idx)) ## return chunk of .source(object)
 })
 
 .pretty_dim <- function(x)
@@ -114,37 +128,49 @@ setGeneric(
 #' @examples
 #' iterate(gen, colSums)
 
+## because "yield" is non-stopping, iterate will be non-stopping... 
 setMethod(
     "iterate", "BiocGenerator",
-    function(x, fun, ...)
+    function(x, fun, stop = FALSE, ...) ## need to make sure "fun" is a method for
+                          ## class(x).
 {
     ## browser()
     result <- list()
     repeat {
-        value <- yield(x)
-        if (is.null(value))
+        x_chunk <- yield(x, stop = stop) 
+        if (is.null(x_chunk))
             break
+        value <- fun(x_chunk)
         result <- c(result, list(value))
     }
-    result
 })
 
+## SEGenerator has added a "y" column, and a "genFun" based on the
+## BiocGenerator ref class. It returns a function, which returns a
+## list, [[1]] being the yielded (realized) data chunk by applying the
+## "genFun", and [[2]] being "y" label. The function is ready to pass
+## into the deep learning model.
+
 SEGenerator <- function(SE, label_column, yieldSize, genFun) {
+    ## genFun: any function, e.g., for normalization
+    ## label_column: usually a categorical variable used as Y ~
+    ## yieldSize: a vector indicating number of rows and column to yield each time.
     gen <- BiocGenerator(SE, yieldSize = yieldSize)
     function() {
-        se_chunk <- yield(gen)
-        x <- genFun(se_chunk)
-        y <- se_chunk[[label_column]]
+        se_chunk <- yield(gen)  ## non-stopping, looped yielding. 
+        x <- genFun(se_chunk)  ## e.g., cpm normalization
+        y <- se_chunk[[label_column]]  ## categorical variable 
         if (!is(y, "numeric")) {
             y <- factor(y, levels = unique(SE[[label_column]]))
             y <- as.matrix(model.matrix(~y+0))
             colnames(y) <- sub("^y", "", colnames(y))
         }
-        list(x, y)  ## return a realized X as matrix
+        list(x, y)  ## return a realized X (data chunk) as matrix, and label y.
     }
 }
 
-cpmNorm <- function(SE)
+## cpmNorm is defined directly on SummarizedExperiment object, which must include an assay name of "count"
+cpmNorm <- function(SE)  
 {
     dat <- counts(SE)
     t(edgeR::cpm(dat, log = TRUE))
